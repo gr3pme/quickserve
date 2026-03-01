@@ -1,6 +1,6 @@
 # quickserve
 
-A lightweight local development server with built-in health checks, readiness probes, and shell integration.
+A lightweight local development server with built-in health checks and readiness probes. Zero dependencies — just Node.js.
 
 ## Install
 
@@ -11,9 +11,8 @@ curl -fsSL https://raw.githubusercontent.com/gr3pme/quickserve/main/install.sh |
 Or manually:
 
 ```bash
-git clone https://github.com/gr3pme/quickserve.git
-cd quickserve
-make install
+git clone https://github.com/gr3pme/quickserve.git ~/.quickserve
+ln -sf ~/.quickserve/bin/quickserve ~/.local/bin/quickserve
 ```
 
 ## Usage
@@ -75,7 +74,8 @@ See our [privacy policy](https://quickserve.dev/privacy) for details on what's c
 ## Requirements
 
 - Node.js 16+
-- npm
+
+No npm packages or build step required.
 
 ## License
 

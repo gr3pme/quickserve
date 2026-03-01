@@ -17,21 +17,15 @@ echo ""
 
 echo "Checking dependencies..."
 
-for cmd in git node npm; do
+for cmd in node; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "  ✗ $cmd not found"
         echo ""
         echo "Please install $cmd and try again."
         exit 1
     fi
-    echo "  ✓ $cmd $(command -v $cmd)"
+    echo "  ✓ $cmd $(node -v)"
 done
-
-NODE_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
-if [ "$NODE_MAJOR" -lt 16 ]; then
-    echo "  ✗ Node.js 16+ required (found v${NODE_MAJOR})"
-    exit 1
-fi
 
 echo ""
 
@@ -39,25 +33,29 @@ echo ""
 
 if [ -d "$INSTALL_DIR" ]; then
     echo "Updating existing installation..."
-    cd "$INSTALL_DIR"
-    git pull --quiet origin main
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        cd "$INSTALL_DIR"
+        git pull --quiet origin main 2>/dev/null || true
+    fi
 else
-    echo "Cloning quickserve..."
-    git clone --quiet https://github.com/gr3pme/quickserve.git "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
+    if command -v git &>/dev/null; then
+        echo "Cloning quickserve..."
+        git clone --quiet https://github.com/gr3pme/quickserve.git "$INSTALL_DIR" 2>/dev/null
+    else
+        echo "Downloading quickserve..."
+        mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/scripts"
+        curl -sfL https://raw.githubusercontent.com/gr3pme/quickserve/main/bin/quickserve \
+            -o "$INSTALL_DIR/bin/quickserve"
+        curl -sfL https://raw.githubusercontent.com/gr3pme/quickserve/main/scripts/shell-init.sh \
+            -o "$INSTALL_DIR/scripts/shell-init.sh"
+    fi
 fi
-
-echo "Installing dependencies..."
-npm install --quiet --no-audit --no-fund 2>/dev/null
-
-echo "Building..."
-npm run build --quiet 2>/dev/null
 
 # ── Link binary ─────────────────────────────────────────────────────
 
 mkdir -p "$BIN_DIR"
-ln -sf "${INSTALL_DIR}/dist/cli.js" "${BIN_DIR}/quickserve"
-chmod +x "${INSTALL_DIR}/dist/cli.js"
+ln -sf "${INSTALL_DIR}/bin/quickserve" "${BIN_DIR}/quickserve"
+chmod +x "${INSTALL_DIR}/bin/quickserve"
 
 echo "  ✓ Installed to ${INSTALL_DIR}"
 echo "  ✓ Binary linked at ${BIN_DIR}/quickserve"
@@ -68,23 +66,19 @@ echo "  ✓ Binary linked at ${BIN_DIR}/quickserve"
 # the developer experience. See: https://quickserve.dev/telemetry
 
 SHELL_RC=""
-SHELL_NAME=""
 
 if [ -n "${ZSH_VERSION:-}" ] || [ "$(basename "$SHELL")" = "zsh" ]; then
     SHELL_RC="${HOME}/.zshrc"
-    SHELL_NAME="zsh"
 elif [ -n "${BASH_VERSION:-}" ] || [ "$(basename "$SHELL")" = "bash" ]; then
     SHELL_RC="${HOME}/.bashrc"
-    SHELL_NAME="bash"
 fi
 
 if [ -n "$SHELL_RC" ]; then
-    # Only add if not already present
     if ! grep -q "quickserve shell-init" "$SHELL_RC" 2>/dev/null; then
         echo "" >> "$SHELL_RC"
         echo "# quickserve shell integration (PATH, completions, session analytics)" >> "$SHELL_RC"
         echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
-        echo "eval \"\$($HOME/.quickserve/dist/shell-init.sh)\"" >> "$SHELL_RC"
+        echo "eval \"\$(cat \$HOME/.quickserve/scripts/shell-init.sh)\"" >> "$SHELL_RC"
 
         echo "  ✓ Shell integration added to ${SHELL_RC}"
     else

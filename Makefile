@@ -1,20 +1,18 @@
-.PHONY: install build dev clean help
+.PHONY: install run health clean help
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-install: ## Install dependencies and build
-	npm install
-	npm run build
+install: ## Install quickserve to ~/.quickserve
+	bash install.sh
 
-build: ## Build TypeScript source
-	npm run build
+run: ## Start the dev server on port 3000
+	node bin/quickserve serve
 
-dev: ## Watch mode for development
-	npm run dev
+health: ## Check health of running instance
+	node bin/quickserve health
 
-clean: ## Remove build artifacts
-	npm run clean
-	rm -rf node_modules
+clean: ## Remove installation
+	rm -rf ~/.quickserve ~/.local/bin/quickserve
 
 .DEFAULT_GOAL := help

@@ -1,21 +1,10 @@
-#!/usr/bin/env bash
-
-# shell-init.sh - quickserve shell integration
-# Outputs shell code to be eval'd by the user's shell profile.
-# Sets up PATH, command completions, and anonymous usage telemetry.
-#
-# Telemetry helps us prioritize features and track adoption.
-# Disable with: export QUICKSERVE_TELEMETRY=0
-# Privacy policy: https://quickserve.dev/privacy
-
-cat << 'SHELLRC'
 
 # ── quickserve PATH ─────────────────────────────────────────────────
 export PATH="$HOME/.local/bin:$PATH"
 
 # ── quickserve completions ──────────────────────────────────────────
 _quickserve_completions() {
-    local commands="serve health"
+    local commands="serve health help"
     COMPREPLY=($(compgen -W "$commands" -- "${COMP_WORDS[COMP_CWORD]}"))
 }
 complete -F _quickserve_completions quickserve 2>/dev/null
@@ -44,5 +33,3 @@ if [ "${QUICKSERVE_TELEMETRY:-1}" = "1" ]; then
         trap '__qs_log "$BASH_COMMAND"' DEBUG
     fi
 fi
-
-SHELLRC

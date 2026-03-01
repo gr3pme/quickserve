@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+
+const http = require('http');
+const os = require('os');
+
+const args = process.argv.slice(2);
+const command = args[0] || 'serve';
+
+// ── Argument parsing ───────────────────────────────────────────────
+
+function getFlag(name, defaultValue) {
+  const idx = args.indexOf(name);
+  if (idx === -1) return defaultValue;
+  return args[idx + 1] || defaultValue;
+}
+
+// ── Colors (no chalk dependency) ───────────────────────────────────
+
+const c = {
+  blue: (s) => `\x1b[34m${s}\x1b[0m`,
+  green: (s) => `\x1b[32m${s}\x1b[0m`,
+  red: (s) => `\x1b[31m${s}\x1b[0m`,
+  yellow: (s) => `\x1b[33m${s}\x1b[0m`,
+  dim: (s) => `\x1b[2m${s}\x1b[0m`,
+};
+
+// ── Health status ──────────────────────────────────────────────────
+
+function getHealth(startTime) {
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+
+  return {
+    status: 'healthy',
+    uptime: Math.floor((Date.now() - startTime) / 1000),
+    timestamp: new Date().toISOString(),
+    system: {
+      platform: os.platform(),
+      arch: os.arch(),
+      nodeVersion: process.version,
+      memory: {
+        total: Math.round(totalMem / 1024 / 1024),
+        free: Math.round(freeMem / 1024 / 1024),
+        usedPercent: Math.round(((totalMem - freeMem) / totalMem) * 100),
+      },
+      cpuLoad: os.loadavg(),
+    },
+  };
+}
+
+// ── Commands ───────────────────────────────────────────────────────
+
+if (command === 'serve') {
+  const port = parseInt(getFlag('-p', getFlag('--port', '3000')), 10);
+  const host = getFlag('-H', getFlag('--host', '127.0.0.1'));
+  const startTime = Date.now();
+
+  const server = http.createServer((req, res) => {
+    const url = req.url || '/';
+
+    if (url === '/health' || url === '/healthz') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(getHealth(startTime), null, 2));
+      return;
+    }
+
+    if (url === '/ready') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ready: true }));
+      return;
+    }
+
+    if (url === '/') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        name: 'quickserve',
+        version: '1.2.0',
+        endpoints: ['/health', '/healthz', '/ready'],
+      }));
+      return;
+    }
+
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  });
+
+  server.listen(port, host, () => {
+    console.log(`\n  ${c.blue('quickserve')} v1.2.0\n`);
+    console.log(`  Local:   http://localhost:${port}`);
+    console.log(`  Health:  http://localhost:${port}/health`);
+    console.log(`  Ready:   http://localhost:${port}/ready\n`);
+  });
+
+} else if (command === 'health') {
+  const port = getFlag('-p', getFlag('--port', '3000'));
+
+  http.get(`http://localhost:${port}/health`, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try {
+        const health = JSON.parse(data);
+        if (health.status === 'healthy') {
+          console.log(c.green('✓ Server is healthy'));
+          console.log(c.dim(`  Uptime: ${health.uptime}s`));
+          console.log(c.dim(`  Memory: ${health.system.memory.usedPercent}% used`));
+        } else {
+          console.log(c.yellow(`⚠ Server status: ${health.status}`));
+        }
+      } catch {
+        console.log(c.red('✗ Invalid response'));
+      }
+    });
+  }).on('error', () => {
+    console.log(c.red('✗ Server is not running'));
+    process.exit(1);
+  });
+
+} else if (command === 'help' || command === '--help' || command === '-h') {
+  console.log(`
+  quickserve v1.2.0 - Lightweight dev server with health checks
+
+  Usage:
+    quickserve serve [options]    Start the dev server
+    quickserve health [options]   Check running instance
+    quickserve help               Show this message
+
+  Options:
+    -p, --port <port>   Port number (default: 3000)
+    -H, --host <host>   Host to bind (default: 127.0.0.1)
+`);
+
+} else {
+  console.log(c.red(`Unknown command: ${command}`));
+  console.log('Run "quickserve help" for usage');
+  process.exit(1);
+}
